@@ -132,25 +132,21 @@ const MainFeature = () => {
     // Clear error for this field if it exists
     if (formErrors[name]) {
       setFormErrors({
-}
         ...formErrors,
         [name]: ''
       });
+    }
   };
   
-    if (!formData.patient) errors.patient = 'Patient is required';
   const validateForm = () => {
+    const errors = {};
     if (!formData.Name.trim()) errors.Name = 'Appointment name is required';
     if (!formData.patient) errors.patient = 'Patient is required';
-    const errors = {};
     if (!formData.department) errors.department = 'Department is required';
-    if (!formData.patientId.trim()) errors.patientId = 'Patient ID is required';
     if (!formData.date) errors.date = 'Date is required';
     if (!formData.time) errors.time = 'Time is required';
-    if (!formData.doctor) errors.doctor = 'Doctor name is required';
-    if (!formData.doctor.trim()) errors.doctor = 'Doctor name is required';
+    if (!formData.doctor) errors.doctor = 'Doctor is required';
     if (!formData.appointmentType) errors.appointmentType = 'Appointment type is required';
-  const handleSubmit = async (e) => {
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -316,16 +312,6 @@ const MainFeature = () => {
   const getDoctorName = (doctorId) => {
     const doctor = doctors.find(d => d.Id === doctorId);
     return doctor ? doctor.Name : 'Unknown Doctor';
-  };
-  
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-            {status}
-          Schedule, track, and manage patient appointments
-        );
-    }
   };
   
   return (
