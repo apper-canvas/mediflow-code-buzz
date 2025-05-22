@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { useSelector, useDispatch } from 'react-redux';
+import { setFilter, setSearchTerm } from '../store/appointmentSlice';
 import { getIcon } from '../utils/iconUtils';
+import { getAppointments, createAppointment, updateAppointment, deleteAppointment } from '../services/appointmentService';
+import { getDepartments } from '../services/departmentService';
+import { getDoctors } from '../services/doctorService';
+import { getPatients } from '../services/patientService';
 
 const MainFeature = () => {
   // Icon components
@@ -16,121 +22,104 @@ const MainFeature = () => {
   const EditIcon = getIcon('edit-2');
   const TrashIcon = getIcon('trash-2');
   
+  const dispatch = useDispatch();
+  
   // State for appointments
   const [appointments, setAppointments] = useState([]);
   const [filteredAppointments, setFilteredAppointments] = useState([]);
-  const [filter, setFilter] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [loadingPatients, setLoadingPatients] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentAppointment, setCurrentAppointment] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Get filter and search from Redux
+  const { filter, searchTerm } = useSelector((state) => state.appointments);
   
   // Form state
   const [formData, setFormData] = useState({
-    patientName: '',
-    patientId: '',
+    Name: '',
+    patient: '',
     date: '',
     time: '',
     department: '',
     doctor: '',
     appointmentType: '',
     notes: '',
-    status: 'scheduled'
+    status: 'scheduled',
+    Tags: ''
   });
   
   // Form validation state
   const [formErrors, setFormErrors] = useState({});
   
-  // Dummy data initialization
+  // Fetch appointments
   useEffect(() => {
-    const dummyAppointments = [
-      {
-        id: 1,
-        patientName: 'John Smith',
-        patientId: 'P-10042',
-        date: '2023-09-18',
-        time: '09:30',
-        department: 'Cardiology',
-        doctor: 'Dr. Maria Johnson',
-        appointmentType: 'Follow-up',
-        notes: 'Blood pressure check and medication review',
-        status: 'scheduled'
-      },
-      {
-        id: 2,
-        patientName: 'Emily Davis',
-        patientId: 'P-10078',
-        date: '2023-09-18',
-        time: '10:15',
-        department: 'Neurology',
-        doctor: 'Dr. Robert Chen',
-        appointmentType: 'Consultation',
-        notes: 'Initial consultation for recurring headaches',
-        status: 'completed'
-      },
-      {
-        id: 3,
-        patientName: 'Michael Wilson',
-        patientId: 'P-10103',
-        date: '2023-09-18',
-        time: '14:00',
-        department: 'Orthopedics',
-        doctor: 'Dr. Sarah Miller',
-        appointmentType: 'Pre-surgery',
-        notes: 'Pre-operative assessment for knee replacement',
-        status: 'cancelled'
-      },
-      {
-        id: 4,
-        patientName: 'Lisa Brown',
-        patientId: 'P-10117',
-        date: '2023-09-19',
-        time: '11:30',
-        department: 'Dermatology',
-        doctor: 'Dr. James Wilson',
-        appointmentType: 'Checkup',
-        notes: 'Annual skin examination',
-        status: 'scheduled'
-      },
-      {
-        id: 5,
-        patientName: 'David Thompson',
-        patientId: 'P-10129',
-        date: '2023-09-19',
-        time: '15:45',
-        department: 'Ophthalmology',
-        doctor: 'Dr. Elizabeth Taylor',
-        appointmentType: 'Follow-up',
-        notes: 'Post-operative checkup after cataract surgery',
-        status: 'scheduled'
+    const fetchAppointmentData = async () => {
+      try {
+        setLoadingAppointments(true);
+        const filters = {};
+        
+        if (filter !== 'all') {
+          filters.status = filter;
+        }
+        
+        if (searchTerm) {
+          filters.search = searchTerm;
+        }
+        
+        const appointmentsData = await getAppointments(filters);
+        setAppointments(appointmentsData);
+        setFilteredAppointments(appointmentsData);
+      } catch (error) {
+        console.error('Failed to fetch appointments:', error);
+        toast.error('Failed to load appointments. Please try again.');
+      } finally {
+        setLoadingAppointments(false);
       }
-    ];
-    
-    setAppointments(dummyAppointments);
-    setFilteredAppointments(dummyAppointments);
-  }, []);
+    };
+
+    fetchAppointmentData();
+  }, [filter, searchTerm]);
   
-  // Apply filters and search
+  // Fetch reference data (departments, doctors, patients)
   useEffect(() => {
-    let result = [...appointments];
+    const fetchReferenceData = async () => {
+      try {
+        // Fetch departments
+        setLoadingDepartments(true);
+        const departmentsData = await getDepartments();
+        setDepartments(departmentsData);
+        setLoadingDepartments(false);
+        
+        // Fetch doctors
+        setLoadingDoctors(true);
+        const doctorsData = await getDoctors();
+        setDoctors(doctorsData);
+        setLoadingDoctors(false);
+        
+        // Fetch patients
+        setLoadingPatients(true);
+        const patientsData = await getPatients();
+        setPatients(patientsData);
+        setLoadingPatients(false);
+        
+      } catch (error) {
+        console.error('Failed to fetch reference data:', error);
+        toast.error('Failed to load reference data. Some dropdown options may be missing.');
+        setLoadingDepartments(false);
+        setLoadingDoctors(false);
+        setLoadingPatients(false);
+      }
+    };
     
-    // Apply status filter
-    if (filter !== 'all') {
-      result = result.filter(appointment => appointment.status === filter);
-    }
-    
-    // Apply search filter
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      result = result.filter(appointment => 
-        appointment.patientName.toLowerCase().includes(search) ||
-        appointment.patientId.toLowerCase().includes(search) ||
-        appointment.doctor.toLowerCase().includes(search) ||
-        appointment.department.toLowerCase().includes(search)
-      );
-    }
-    
-    setFilteredAppointments(result);
-  }, [appointments, filter, searchTerm]);
+    fetchReferenceData();
+  }, []);
   
   // Form handlers
   const handleInputChange = (e) => {
@@ -143,56 +132,139 @@ const MainFeature = () => {
     // Clear error for this field if it exists
     if (formErrors[name]) {
       setFormErrors({
+}
         ...formErrors,
         [name]: ''
       });
     }
-  };
-  
+    if (!formData.Name.trim()) errors.Name = 'Appointment name is required';
+    if (!formData.patient) errors.patient = 'Patient is required';
   const validateForm = () => {
     const errors = {};
-    
-    if (!formData.patientName.trim()) errors.patientName = 'Patient name is required';
+    if (!formData.department) errors.department = 'Department is required';
+    if (!formData.doctor) errors.doctor = 'Doctor is required';
     if (!formData.patientId.trim()) errors.patientId = 'Patient ID is required';
     if (!formData.date) errors.date = 'Date is required';
     if (!formData.time) errors.time = 'Time is required';
     if (!formData.department) errors.department = 'Department is required';
     if (!formData.doctor.trim()) errors.doctor = 'Doctor name is required';
     if (!formData.appointmentType) errors.appointmentType = 'Appointment type is required';
-    
+  const handleSubmit = async (e) => {
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
   
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    setSubmitting(true);
     
-    if (!validateForm()) {
-      toast.error("Please fill all required fields");
-      return;
-    }
-    
-    if (currentAppointment) {
-      // Update existing appointment
-      const updatedAppointments = appointments.map(appointment => 
-        appointment.id === currentAppointment.id 
-          ? { ...formData, id: currentAppointment.id } 
-          : appointment
-      );
+    try {
+      if (currentAppointment) {
+        // Update existing appointment
+        await updateAppointment(currentAppointment.Id, formData);
+        toast.success("Appointment updated successfully");
+      } else {
+        // Create new appointment
+        await createAppointment(formData);
+        toast.success("Appointment created successfully");
+      }
+      
+      // Refresh appointments data
+      const updatedAppointments = await getAppointments({
+        status: filter !== 'all' ? filter : undefined,
+        search: searchTerm || undefined
+      });
       
       setAppointments(updatedAppointments);
-      toast.success("Appointment updated successfully");
-    } else {
-      // Create new appointment
-      const newAppointment = {
-        ...formData,
-        id: appointments.length > 0 ? Math.max(...appointments.map(a => a.id)) + 1 : 1
-      };
+      setFilteredAppointments(updatedAppointments);
       
-      setAppointments([...appointments, newAppointment]);
+      // Reset form
+      resetForm();
+    } catch (error) {
+      console.error('Appointment operation failed:', error);
+      toast.error(currentAppointment 
+        ? "Failed to update appointment. Please try again." 
+        : "Failed to create appointment. Please try again.");
+    } finally {
+      setSubmitting(false);
+        id: appointments.length > 0 ? Math.max(...appointments.map(a => a.id)) + 1 : 1
       toast.success("Appointment created successfully");
     }
-    
+  const handleEdit = async (appointment) => {
+    try {
+      // Fetch the full appointment details if needed
+      const fullAppointment = appointment;
+      
+      setCurrentAppointment(fullAppointment);
+      setFormData({
+        Name: fullAppointment.Name || '',
+        patient: fullAppointment.patient || '',
+        date: fullAppointment.date || '',
+        time: fullAppointment.time || '',
+        department: fullAppointment.department || '',
+        doctor: fullAppointment.doctor || '',
+        appointmentType: fullAppointment.appointmentType || '',
+        notes: fullAppointment.notes || '',
+        status: fullAppointment.status || 'scheduled',
+        Tags: fullAppointment.Tags || ''
+      });
+      setIsFormOpen(true);
+    } catch (error) {
+      console.error('Failed to load appointment details:', error);
+      toast.error('Failed to load appointment details. Please try again.');
+    }
+  };
+  
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this appointment?')) {
+      try {
+        await deleteAppointment(id);
+        
+        // Refresh appointments after delete
+        const updatedAppointments = await getAppointments({
+          status: filter !== 'all' ? filter : undefined,
+          search: searchTerm || undefined
+        });
+        
+        setAppointments(updatedAppointments);
+        setFilteredAppointments(updatedAppointments);
+        
+        toast.success("Appointment deleted successfully");
+      } catch (error) {
+        console.error('Failed to delete appointment:', error);
+        toast.error('Failed to delete appointment. Please try again.');
+      }
+    }
+  };
+  
+  const handleFilterChange = (newFilter) => {
+    dispatch(setFilter(newFilter));
+  };
+  
+  const handleSearchChange = (e) => {
+    dispatch(setSearchTerm(e.target.value));
+  };
+  
+  const resetForm = () => {
+    setFormData({
+      Name: '',
+      patient: '',
+      date: '',
+      time: '',
+      department: '',
+      doctor: '',
+      appointmentType: '',
+      notes: '',
+      status: 'scheduled',
+      Tags: ''
+    });
+    setFormErrors({});
+    setCurrentAppointment(null);
+    setIsFormOpen(false);
+  };
+  
+  /*const handleEdit = (appointment) => {
     // Reset form
     resetForm();
   };
@@ -209,63 +281,65 @@ const MainFeature = () => {
       appointmentType: appointment.appointmentType,
       notes: appointment.notes,
       status: appointment.status
-    });
-    setIsFormOpen(true);
-  };
-  
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this appointment?')) {
-      setAppointments(appointments.filter(appointment => appointment.id !== id));
-      toast.success("Appointment deleted successfully");
-    }
-  };
-  
-  const resetForm = () => {
-    setFormData({
-      patientName: '',
-      patientId: '',
-      date: '',
-      time: '',
+  */
       department: '',
       doctor: '',
       appointmentType: '',
       notes: '',
       status: 'scheduled'
     });
-    setFormErrors({});
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
     setCurrentAppointment(null);
     setIsFormOpen(false);
   };
   
   // Status badge styling
   const getStatusBadge = (status) => {
-    switch (status) {
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
       case 'scheduled':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
             <CalendarIcon className="h-3 w-3" />
             Scheduled
           </span>
-        );
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
       case 'completed':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
             <CheckIcon className="h-3 w-3" />
             Completed
           </span>
-        );
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
       case 'cancelled':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
             <XIcon className="h-3 w-3" />
             Cancelled
           </span>
+  // Find patient name by ID
+  const getPatientName = (patientId) => {
+    const patient = patients.find(p => p.Id === patientId);
+    return patient ? patient.patientName : 'Unknown Patient';
+  };
+  
+  // Find department name by ID
+  const getDepartmentName = (departmentId) => {
+    const department = departments.find(d => d.Id === departmentId);
+    return department ? department.Name : 'Unknown Department';
+  };
+  
+  // Find doctor name by ID
+  const getDoctorName = (doctorId) => {
+    const doctor = doctors.find(d => d.Id === doctorId);
+    return doctor ? doctor.Name : 'Unknown Doctor';
+  };
+  
         );
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
             {status}
-          </span>
+          Schedule, track, and manage patient appointments
         );
     }
   };
@@ -290,7 +364,7 @@ const MainFeature = () => {
               <input
                 type="text"
                 placeholder="Search appointments..."
-                value={searchTerm}
+                  value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 py-2 pr-4 w-full sm:w-64 rounded-lg border border-surface-300 dark:border-surface-600 
                           bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary focus:border-primary"
@@ -310,28 +384,28 @@ const MainFeature = () => {
                             dark:border-surface-700 rounded-lg shadow-lg overflow-hidden">
                 <div className="p-2">
                   <button 
-                    onClick={() => setFilter('all')}
+                    onClick={() => handleFilterChange('all')}
                     className={`w-full text-left px-3 py-2 rounded-md text-sm ${filter === 'all' ? 
                               'bg-primary text-white' : 'hover:bg-surface-100 dark:hover:bg-surface-700'}`}
                   >
                     All Appointments
                   </button>
                   <button 
-                    onClick={() => setFilter('scheduled')}
+                    onClick={() => handleFilterChange('scheduled')}
                     className={`w-full text-left px-3 py-2 rounded-md text-sm ${filter === 'scheduled' ? 
                               'bg-primary text-white' : 'hover:bg-surface-100 dark:hover:bg-surface-700'}`}
                   >
                     Scheduled
                   </button>
                   <button 
-                    onClick={() => setFilter('completed')}
+                    onClick={() => handleFilterChange('completed')}
                     className={`w-full text-left px-3 py-2 rounded-md text-sm ${filter === 'completed' ? 
                               'bg-primary text-white' : 'hover:bg-surface-100 dark:hover:bg-surface-700'}`}
                   >
                     Completed
                   </button>
                   <button 
-                    onClick={() => setFilter('cancelled')}
+                    onClick={() => handleFilterChange('cancelled')}
                     className={`w-full text-left px-3 py-2 rounded-md text-sm ${filter === 'cancelled' ? 
                               'bg-primary text-white' : 'hover:bg-surface-100 dark:hover:bg-surface-700'}`}
                   >
@@ -354,7 +428,11 @@ const MainFeature = () => {
       
       {/* Appointment list */}
       <div className="p-6">
-        {filteredAppointments.length > 0 ? (
+        {loadingAppointments ? (
+          <div className="py-12 text-center">
+            <p className="text-surface-600 dark:text-surface-400">Loading appointments...</p>
+          </div>
+        ) : filteredAppointments.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
@@ -369,7 +447,7 @@ const MainFeature = () => {
               <tbody className="divide-y divide-surface-200 dark:divide-surface-700">
                 {filteredAppointments.map((appointment) => (
                   <motion.tr 
-                    key={appointment.id}
+                    key={appointment.Id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -381,10 +459,10 @@ const MainFeature = () => {
                           <UserIcon className="h-5 w-5" />
                         </div>
                         <div>
-                          <div className="font-medium">{appointment.patientName}</div>
-                          <div className="text-xs text-surface-500 dark:text-surface-400">{appointment.patientId}</div>
+                          <div className="font-medium">{getPatientName(appointment.patient)}</div>
+                          <div className="text-xs text-surface-500 dark:text-surface-400">{appointment.Name}</div>
                           <div className="text-xs text-surface-500 dark:text-surface-400 md:hidden mt-1">
-                            {new Date(appointment.date).toLocaleDateString()} at {appointment.time}
+                            {appointment.date} at {appointment.time}
                           </div>
                           <div className="text-xs text-surface-500 dark:text-surface-400 sm:hidden mt-1">
                             {getStatusBadge(appointment.status)}
@@ -396,7 +474,7 @@ const MainFeature = () => {
                       <div className="flex flex-col">
                         <div className="flex items-center gap-1">
                           <CalendarIcon className="h-4 w-4 text-surface-400" />
-                          <span>{new Date(appointment.date).toLocaleDateString()}</span>
+                          <span>{appointment.date}</span>
                         </div>
                         <div className="flex items-center gap-1 mt-1 text-surface-500 dark:text-surface-400">
                           <ClockIcon className="h-4 w-4" />
@@ -405,8 +483,8 @@ const MainFeature = () => {
                       </div>
                     </td>
                     <td className="px-4 py-4 hidden lg:table-cell">
-                      <div>{appointment.department}</div>
-                      <div className="text-sm text-surface-500 dark:text-surface-400">{appointment.doctor}</div>
+                      <div>{getDepartmentName(appointment.department)}</div>
+                      <div className="text-sm text-surface-500 dark:text-surface-400">{getDoctorName(appointment.doctor)}</div>
                     </td>
                     <td className="px-4 py-4 hidden sm:table-cell">
                       {getStatusBadge(appointment.status)}
@@ -422,7 +500,7 @@ const MainFeature = () => {
                           <EditIcon className="h-4 w-4" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(appointment.id)}
+                          onClick={() => handleDelete(appointment.Id)}
                           className="p-2 rounded-md hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-600 dark:text-surface-400 
                                    hover:text-red-500 dark:hover:text-red-400 transition-colors"
                           aria-label="Delete appointment"
@@ -486,35 +564,40 @@ const MainFeature = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Patient Information */}
                   <div className="md:col-span-2">
-                    <h4 className="text-lg font-medium mb-4">Patient Information</h4>
+                    <h4 className="text-lg font-medium mb-4">Appointment Information</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label htmlFor="patientName" className="input-label">Patient Name</label>
+                        <label htmlFor="Name" className="input-label">Appointment Name</label>
                         <input
                           type="text"
-                          id="patientName"
-                          name="patientName"
-                          value={formData.patientName}
+                          id="Name"
+                          name="Name"
+                          value={formData.Name}
                           onChange={handleInputChange}
-                          className={`input ${formErrors.patientName ? 'border-red-500 dark:border-red-500' : ''}`}
+                          placeholder="e.g., Annual Checkup"
+                          className={`input ${formErrors.Name ? 'border-red-500 dark:border-red-500' : ''}`}
                         />
-                        {formErrors.patientName && (
-                          <p className="mt-1 text-xs text-red-500">{formErrors.patientName}</p>
+                        {formErrors.Name && (
+                          <p className="mt-1 text-xs text-red-500">{formErrors.Name}</p>
                         )}
                       </div>
                       <div>
-                        <label htmlFor="patientId" className="input-label">Patient ID</label>
-                        <input
-                          type="text"
-                          id="patientId"
-                          name="patientId"
-                          value={formData.patientId}
+                        <label htmlFor="patient" className="input-label">Patient</label>
+                        <select
+                          id="patient"
+                          name="patient"
+                          value={formData.patient}
                           onChange={handleInputChange}
-                          placeholder="e.g., P-10042"
-                          className={`input ${formErrors.patientId ? 'border-red-500 dark:border-red-500' : ''}`}
-                        />
-                        {formErrors.patientId && (
-                          <p className="mt-1 text-xs text-red-500">{formErrors.patientId}</p>
+                          className={`input ${formErrors.patient ? 'border-red-500 dark:border-red-500' : ''}`}
+                          disabled={loadingPatients}
+                        >
+                          <option value="">Select patient</option>
+                          {patients.map(patient => (
+                            <option key={patient.Id} value={patient.Id}>{patient.patientName}</option>
+                          ))}
+                        </select>
+                        {formErrors.patient && (
+                          <p className="mt-1 text-xs text-red-500">{formErrors.patient}</p>
                         )}
                       </div>
                     </div>
@@ -560,16 +643,12 @@ const MainFeature = () => {
                           value={formData.department}
                           onChange={handleInputChange}
                           className={`input ${formErrors.department ? 'border-red-500 dark:border-red-500' : ''}`}
+                          disabled={loadingDepartments}
                         >
                           <option value="">Select department</option>
-                          <option value="Cardiology">Cardiology</option>
-                          <option value="Dermatology">Dermatology</option>
-                          <option value="Neurology">Neurology</option>
-                          <option value="Ophthalmology">Ophthalmology</option>
-                          <option value="Orthopedics">Orthopedics</option>
-                          <option value="Pediatrics">Pediatrics</option>
-                          <option value="Psychiatry">Psychiatry</option>
-                          <option value="Urology">Urology</option>
+                          {departments.map(dept => (
+                            <option key={dept.Id} value={dept.Id}>{dept.Name}</option>
+                          ))}
                         </select>
                         {formErrors.department && (
                           <p className="mt-1 text-xs text-red-500">{formErrors.department}</p>
@@ -577,15 +656,19 @@ const MainFeature = () => {
                       </div>
                       <div>
                         <label htmlFor="doctor" className="input-label">Doctor</label>
-                        <input
-                          type="text"
+                        <select
                           id="doctor"
                           name="doctor"
                           value={formData.doctor}
                           onChange={handleInputChange}
-                          placeholder="e.g., Dr. Maria Johnson"
                           className={`input ${formErrors.doctor ? 'border-red-500 dark:border-red-500' : ''}`}
-                        />
+                          disabled={loadingDoctors}
+                        >
+                          <option value="">Select doctor</option>
+                          {doctors.map(doc => (
+                            <option key={doc.Id} value={doc.Id}>{doc.Name}</option>
+                          ))}
+                        </select>
                         {formErrors.doctor && (
                           <p className="mt-1 text-xs text-red-500">{formErrors.doctor}</p>
                         )}
@@ -653,9 +736,10 @@ const MainFeature = () => {
                   </button>
                   <button
                     type="submit"
+                    disabled={submitting}
                     className="btn btn-primary"
                   >
-                    {currentAppointment ? 'Update Appointment' : 'Create Appointment'}
+                    {submitting ? 'Saving...' : (currentAppointment ? 'Update Appointment' : 'Create Appointment')}
                   </button>
                 </div>
               </form>
