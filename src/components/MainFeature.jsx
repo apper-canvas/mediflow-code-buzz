@@ -136,17 +136,18 @@ const MainFeature = () => {
         ...formErrors,
         [name]: ''
       });
-    }
-    if (!formData.Name.trim()) errors.Name = 'Appointment name is required';
+  };
+  
     if (!formData.patient) errors.patient = 'Patient is required';
   const validateForm = () => {
+    if (!formData.Name.trim()) errors.Name = 'Appointment name is required';
+    if (!formData.patient) errors.patient = 'Patient is required';
     const errors = {};
     if (!formData.department) errors.department = 'Department is required';
-    if (!formData.doctor) errors.doctor = 'Doctor is required';
     if (!formData.patientId.trim()) errors.patientId = 'Patient ID is required';
     if (!formData.date) errors.date = 'Date is required';
     if (!formData.time) errors.time = 'Time is required';
-    if (!formData.department) errors.department = 'Department is required';
+    if (!formData.doctor) errors.doctor = 'Doctor name is required';
     if (!formData.doctor.trim()) errors.doctor = 'Doctor name is required';
     if (!formData.appointmentType) errors.appointmentType = 'Appointment type is required';
   const handleSubmit = async (e) => {
@@ -156,16 +157,18 @@ const MainFeature = () => {
   
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
 
     setSubmitting(true);
     
     try {
       if (currentAppointment) {
-        // Update existing appointment
         await updateAppointment(currentAppointment.Id, formData);
         toast.success("Appointment updated successfully");
       } else {
-        // Create new appointment
         await createAppointment(formData);
         toast.success("Appointment created successfully");
       }
@@ -188,9 +191,9 @@ const MainFeature = () => {
         : "Failed to create appointment. Please try again.");
     } finally {
       setSubmitting(false);
-        id: appointments.length > 0 ? Math.max(...appointments.map(a => a.id)) + 1 : 1
-      toast.success("Appointment created successfully");
     }
+  };
+
   const handleEdit = async (appointment) => {
     try {
       // Fetch the full appointment details if needed
@@ -264,58 +267,39 @@ const MainFeature = () => {
     setIsFormOpen(false);
   };
   
-  /*const handleEdit = (appointment) => {
-    // Reset form
-    resetForm();
-  };
-  
-  const handleEdit = (appointment) => {
-    setCurrentAppointment(appointment);
-    setFormData({
-      patientName: appointment.patientName,
-      patientId: appointment.patientId,
-      date: appointment.date,
-      time: appointment.time,
-      department: appointment.department,
-      doctor: appointment.doctor,
-      appointmentType: appointment.appointmentType,
-      notes: appointment.notes,
-      status: appointment.status
-  */
-      department: '',
-      doctor: '',
-      appointmentType: '',
-      notes: '',
-      status: 'scheduled'
-    });
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-    setCurrentAppointment(null);
-    setIsFormOpen(false);
-  };
-  
   // Status badge styling
   const getStatusBadge = (status) => {
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
+    switch (status) {
       case 'scheduled':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
             <CalendarIcon className="h-3 w-3" />
             Scheduled
           </span>
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+        );
       case 'completed':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
             <CheckIcon className="h-3 w-3" />
             Completed
           </span>
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+        );
       case 'cancelled':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
             <XIcon className="h-3 w-3" />
             Cancelled
           </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+            {status}
+          </span>
+        );
+    }
+  };
+  
   // Find patient name by ID
   const getPatientName = (patientId) => {
     const patient = patients.find(p => p.Id === patientId);
@@ -365,7 +349,7 @@ const MainFeature = () => {
                 type="text"
                 placeholder="Search appointments..."
                   value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={handleSearchChange}
                 className="pl-10 py-2 pr-4 w-full sm:w-64 rounded-lg border border-surface-300 dark:border-surface-600 
                           bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary focus:border-primary"
               />
